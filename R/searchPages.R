@@ -5,7 +5,7 @@
 #' Search pages that mention a string
 #'
 #' @description
-#' \code{searchPages} retrieves public status updates that mention a given keyword
+#' \code{searchPages} retrieves public pages that mention a given keyword
 #'
 #' @author
 #' Pablo Barbera \email{pablo.barbera@@nyu.edu}, Joel Gombin \email{joel.gombin@@gmail.com}
@@ -45,7 +45,7 @@ searchPages <- function(string, token, n=200)
                "&fields=id,about,category,category_list,description,general_info,likes,link,location,name,talking_about_count,username,website",
                sep="")
   
-  url <- URLencode(url)
+  url <- utils::URLencode(url)
   
   ## making query
   content <- callAPI(url=url, token=token)

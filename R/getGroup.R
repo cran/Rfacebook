@@ -1,19 +1,18 @@
-#' @rdname getPage
+#' @rdname getGroup
 #' @export
 #'
 #' @title 
-#' Extract list of posts from a public Facebook page
+#' Extract list of posts from a public Facebook group
 #'
 #' @description
-#' \code{getPage} retrieves information from a public Facebook page. Note that
-#' information about users that have turned on the "follow" option on their 
-#' profile can also be retrieved with this function.
+#' \code{getGroup} retrieves information from a public Facebook group.
 #'
 #' @author
 #' Pablo Barbera \email{pablo.barbera@@nyu.edu}
 #' @seealso \code{\link{getUsers}}, \code{\link{getPost}}, \code{\link{fbOAuth}}
 #'
-#' @param page A page ID or page name.
+#' @param group_id Facebook ID for the group. Note that this is different from
+#' the name on the URL. You can use \code{searchGroup} to find the ID.
 #'
 #' @param token Either a temporary access token created at
 #' \url{https://developers.facebook.com/tools/explorer} or the OAuth token 
@@ -30,35 +29,24 @@
 #' the end of the time range to be searched. For more information on the
 #' accepted values, see: \url{http://php.net/manual/en/function.strtotime.php}
 #'
-#' @param feed If \code{TRUE}, the function will also return posts on the page
-#' that were made by others (not only the admin of the page).
-#'
 #'
 #' @examples \dontrun{
-#' ## See examples for fbOAuth to know how token was created.
-#' ## Getting information about Facebook's Facebook Page
-#'  load("fb_oauth")
-#'  fb_page <- getPage(page="facebook", token=fb_oauth)
-#' ## Getting posts on Humans of New York page, including posts by others users
-#' ## (not only owner of page)
-#'  page <- getPage(page="humansofnewyork", token=fb_oauth, feed=TRUE)
-#' ## Getting posts on Humans of New York page in January 2013
-#'  page <- getPage(page="humansofnewyork", token=fb_oauth, n=1000,
-#'    since='2013/01/01', until='2013/01/31')
+#' ## Find Facebook ID for R-Users Facebook group
+#'	load("fb_oauth")
+#'	ids <- searchGroup(name="rusers", token=fb_oauth)
+#'  ids[1,] # id = 18533493739
+#' ## Downloading posts from R-Users Facebook group
+#'  group <- getGroup(group_id=18533493739, token=fb_oauth)
+#' ## Downloading posts from R-Users Facebook group in January 2013
+#'  group <- getGroup(group_id=18533493739, token=fb_oauth,
+#'		since='2013/01/01', until='2013/01/31')
 #' }
-#'
 
+getGroup <- function(group_id, token, n=100, since=NULL, until=NULL){
 
-getPage <- function(page, token, n=100, since=NULL, until=NULL, feed=FALSE){
-
-	url <- paste0('https://graph.facebook.com/', page,
-		'/posts?fields=from,message,created_time,type,link,comments.summary(true)',
-		',likes.summary(true),shares')
-	if (feed){
-		url <- paste0('https://graph.facebook.com/', page,
+	url <- paste0('https://graph.facebook.com/', group_id,
 		'/feed?fields=from,message,created_time,type,link,comments.summary(true)',
 		',likes.summary(true),shares')
-	}
 	if (!is.null(until)){
 		url <- paste0(url, '&until=', until)
 	}
@@ -140,3 +128,51 @@ getPage <- function(page, token, n=100, since=NULL, until=NULL, feed=FALSE){
 	return(df)
 }
 
+
+#' @rdname searchGroup
+#' @export
+#' @title 
+#' Find Facebook ID of a group
+#'
+#' @description
+#' Use \code{searchGroup} in combination with \code{getGroup} to scrape
+#' public posts on Facebook groups.
+#'
+#' @param name Name of Facebook group (in URL)
+#'
+#' @param token Either a temporary access token created at
+#' \url{https://developers.facebook.com/tools/explorer} or the OAuth token 
+#' created with \code{fbOAuth}.
+
+#' @examples \dontrun{
+#' ## Find Facebook ID for R-Users Facebook group
+#'	load("fb_oauth")
+#'	ids <- searchGroup(name="rusers", token=fb_oauth)
+#'  ids[1,] # id = 18533493739
+#' ## Downloading posts from R-Users Facebook group
+#'  group <- getGroup(group_id=18533493739, token=fb_oauth)
+#' ## Downloading posts from R-Users Facebook group in January 2013
+#'  group <- getGroup(group_id=18533493739, token=fb_oauth,
+#'		since='2013/01/01', until='2013/01/31')
+#' }
+
+searchGroup <- function(name, token){
+	url <- paste0('https://graph.facebook.com/search?q=',
+		name, '&type=group')
+	# making query
+	content <- callAPI(url=url, token=token)
+
+	# if no data, return error message
+	if (length(content$data)==0){ 
+		stop("No groups with this name were found.")
+	}
+
+	# if data, return a data frame
+	df <- data.frame(
+		name = unlist(lapply(content$data, '[[', 'name')),
+		privacy = unlist(lapply(content$data, '[[', 'privacy')),
+		id = unlist(lapply(content$data, '[[', 'id')),
+		stringsAsFactors=F)
+
+	return(df)
+}

@@ -48,14 +48,48 @@ pageDataToDF <- function(json){
 	return(df)
 }
 
-insightsDataToDF <- function(json, values){
+insightsDataToDF <- function(x){
+  
+  values <- list()
+  
+  if(grepl('^post',x$data[[1]]$name)){
+  
+  for (i in 1:length(x$data[[1]]$values)){
+    tmp <- data.frame(unlist(x$data[[1]]$values[[i]]$value), stringsAsFactors=F)
+    tmp$variable <- row.names(tmp)
+    row.names(tmp) <- NULL
+    names(tmp) <- c('value', 'variable')
+    values[[i]] <- tmp
+  }  
+  } else { 
+    
+  for (i in 1:length(x$data[[1]]$values)){
+    tmp <- data.frame(unlist(x$data[[1]]$values[[i]]$value), end_time=x$data[[1]]$values[[i]]$end_time, stringsAsFactors=F)
+    tmp$variable <- row.names(tmp)
+    row.names(tmp) <- NULL
+    names(tmp) <- c('value', 'end_time', 'variable')
+    values[[i]] <- tmp
+  }
+  }
+  
+  values <- do.call('rbind',values)
+  
   df <- data.frame(
-    id = unlistWithNA(json, 'id'),
-    metric_name = unlistWithNA(json, 'name'),
-    period = unlistWithNA(json, 'period'),
-    values = unlistWithNA(values, 'value'),
-    end_time = unlistWithNA(values, 'end_time'),
-    stringsAsFactors=F)
+    id=x$data[[1]]$id,
+    name=x$data[[1]]$name,
+    period=x$data[[1]]$period,
+    title=x$data[[1]]$title,
+    description=x$data[[1]]$description,
+    values,
+    stringsAsFactors=FALSE
+  )
+
+  if(length(unique(df$variable))==1 & df$variable[1]==1){
+    df$variable <- NULL
+  } else {
+    df <- df
+  }
+
   return(df)
 }
 
@@ -115,6 +149,7 @@ userDataToDF <- function(user_data, private_info){
 		name = unlistWithNA(user_data, 'name'),
 		username = unlistWithNA(user_data, 'username'),
 		first_name = unlistWithNA(user_data, 'first_name'),
+		middle_name = unlistWithNA(user_data, 'middle_name'),
 		last_name = unlistWithNA(user_data, 'last_name'),
 		gender = unlistWithNA(user_data, 'gender'),
 		locale = unlistWithNA(user_data, 'locale'),
@@ -178,7 +213,7 @@ unlistWithNA <- function(lst, field){
 	if (length(field)==1){
 		notnulls <- unlist(lapply(lst, function(x) !is.null(x[[field]])))
 		vect <- rep(NA, length(lst))
-		vect[notnulls] <- unlist(lapply(lst, '[[', field))
+		vect[notnulls] <- unlist(lapply(lst, function(x) x[[field]]))
 	}
 	if (length(field)==2){
 		notnulls <- unlist(lapply(lst, function(x) !is.null(x[[field[1]]][[field[2]]])))
@@ -221,7 +256,11 @@ searchPageDataToDF <- function(json){
     general_info = unlistWithNA(json, 'general_info'),
     likes = unlistWithNA(json, 'likes'),
     link = unlistWithNA(json, 'link'),
-    #    location = unlistWithNA(json, 'location'),
+    city = unlistWithNA(json, c('location', 'city')),
+    state = unlistWithNA(json, c('location', 'state')),
+    country = unlistWithNA(json, c('location', 'country')),
+    latitude = unlistWithNA(json, c('location', 'latitude')),
+    longitude = unlistWithNA(json, c('location', 'longitude')),
     name = unlistWithNA(json, 'name'),
     talking_about_count = unlistWithNA(json, 'talking_about_count'),
     username = unlistWithNA(json, 'username'),
@@ -245,7 +284,7 @@ callAPI <- function(url, token){
 	if (class(token)[1]!="character" & class(token)[1]!="config" & class(token)[1]!="Token2.0"){
 		stop("Error in access token. See help for details.")
 	}
-	content <- fromJSON(rawToChar(url.data$content))
+	content <- rjson::fromJSON(rawToChar(url.data$content))
 	if (length(content$error)>0){
 		stop(content$error$message)
 	}	

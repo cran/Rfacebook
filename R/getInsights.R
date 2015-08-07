@@ -6,11 +6,20 @@
 #'
 #' @description
 #' \code{getInsights} retrieves information from an owned Facebook page. Note 
-#' that you must specify wich metric from insights you need. 
+#' that you must specify wich metric from insights you need and the period.
+#'
+#' @details
+#' The current list of supported metrics and periods is: page_fan_adds, page_fan_removes, 
+#' page_views_login, page_views_login, page_views_logout, page_views, page_story_adds, 
+#' page_impressions, page_posts_impressions, page_consumptions, post_consumptions_by_type, 
+#' page_consumptions, and page_fans_country.
+#'
+#' For more information, see: \url{https://developers.facebook.com/docs/graph-api/reference/v2.1/insights}
 #'
 #' @author
 #' Danilo Silva \email{silvadaniloc@@gmail.com}
 #' Eduardo Carvalho \email{eduardooc.86@@gmail.com}
+#' Andrew Geisler \url{https://github.com/andrewgeisler}
 #'
 #' @param object_id An object (page, post, domain) ID.
 #'
@@ -18,10 +27,12 @@
 #' \url{https://developers.facebook.com/tools/explorer} or the OAuth token 
 #' created with \code{fbOAuth}.
 #'
+#' @param metric The metric which you want to get values for.
+#'
 #' @param period Time intervals to return
 #' 
-#' @param metric The metric wich you want to get values (All metrics are listed
-#' in https://developers.facebook.com/docs/graph-api/reference/v2.1/insights)
+#' @param parms Optional argument that can be used to append additional
+#' parameters. For example, \code{&since=DATE&until=DATE}.
 #' 
 #' @param n Number of time intervals of metric values to return. Note that all
 #' metrics returned will be multiple of 3, except for lifetime period. Default
@@ -35,24 +46,39 @@
 #' ## (only owner or admin of page)
 #'  load("fb_oauth")
 #'	insights <- getInsights(object_id="20531316728", token=fb_oauth, metric='page_impressions')
-#' ## Getting post impressions for a random Facebook`s page post
+#' ## Getting post impressions for a random Facebook's page post
 #' ## (only owner or admin of page)
 #'  insights <- getInsights(object_id='221568044327801_754789777921289', 
 #'      token=fb_oauth, metric='post_impressions', period='days_28')
+#' ## Getting page fans for date range
+#' ## (only owner or admin of page)
+#' insights <- getInsights(object_id='221568044327801',
+#'     token=fb_oauth, metric='page_fans', period='lifetime', 
+#'     parms='&since=2015-01-01&until=2015-01-31')     
+#' ## Count of fans by country
+#'   insights <- getInsights(object_id='221568044327801_754789777921289', 
+#'      token=fb_oauth, metric='page_fans_country', period='lifetime')
 #' }
 #'
 
-getInsights <- function(object_id, token, metric, period='day', n=5){
-  url <- paste0('https://graph.facebook.com/', object_id,
-                '/insights/', metric, '?period=', period)
+getInsights <- function(object_id, token, metric, period='day', parms=NA, n=5){ 
+  
+  ##IF PARMS ARGUMENT IS PRESENT, CONCAT TO END OF URL, OTHERWISE OMIT.
+  if(is.na(parms)){
+    url <- paste0('https://graph.facebook.com/', object_id,
+                  '/insights/', metric, '?period=', period)
+  }else{
+    url <- paste0('https://graph.facebook.com/', object_id,
+                  '/insights/', metric, '?period=', period, parms)  
+  }
   
   # making query
   content <- callAPI(url=url, token=token)
-  l <- length(content$data[[1]]$values)
-  if (l==0){ 
-    stop("No public posts mentioning the string were found")
+  if (length(content$data)==0){ 
+    stop("No data available. Are you the owner of this page? See ?getInsights.")
   }
-  
+
+  l <- length(content$data[[1]]$values)
   ## retrying 3 times if error was found
   error <- 0
   while (length(content$error_code)>0){
@@ -63,19 +89,17 @@ getInsights <- function(object_id, token, metric, period='day', n=5){
     content <- callAPI(url=url, token=token)		
     if (error==3){ stop(content$error_msg) }
   }
-  if (length(content$data)==0){ 
-    stop("No public posts mentioning the string were found")
-  }
-  df <- insightsDataToDF(content$data, content$data[[1]]$values)
+
+  df <- insightsDataToDF(content)
   
   if (n>nrow(df)){
     df.list <- list(df)
     while (l<n & l>0 & 
-             !is.null(content$paging$`next`)&
+             !is.null(content$paging$`previous`)&
              period != 'lifetime'){
       # waiting one second before making next API call...
       Sys.sleep(0.5)
-      url <- content$paging$`next`
+      url <- content$paging$`previous`
       content <- callAPI(url=url, token=token)
       l <- l + nrow(df)
       
@@ -89,10 +113,10 @@ getInsights <- function(object_id, token, metric, period='day', n=5){
         if (error==3){ stop(content$error_msg) }
       }
       
-      df.list <- c(df.list, list(insightsDataToDF(content$data, content$data[[1]]$values)))
+      df.list <- c(df.list, list(insightsDataToDF(content)))
     }
     df <- do.call(rbind, df.list)
   }
-  cat(l, "objects found ")
+  if ('end_time' %in% names(df)){ df <- df[order(df$end_time),] }
   return(df)
 }
