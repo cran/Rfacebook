@@ -9,6 +9,15 @@
 #' information about users that have turned on the "follow" option on their 
 #' profile can also be retrieved with this function.
 #'
+#'
+#' @details
+#' This function will only return information from public pages, not users
+#' with public profiles.
+#'
+#' The \code{since} and \code{until} parameters are applied to the \code{updated_time}
+#' field in the post objects, and not the \code{created_time}. As a result, this function
+#' might return old posts that have been updated recently. 
+#'
 #' @author
 #' Pablo Barbera \email{pablo.barbera@@nyu.edu}
 #' @seealso \code{\link{getUsers}}, \code{\link{getPost}}, \code{\link{fbOAuth}}
@@ -49,7 +58,7 @@
 #'
 
 
-getPage <- function(page, token, n=100, since=NULL, until=NULL, feed=FALSE){
+getPage <- function(page, token, n=80, since=NULL, until=NULL, feed=FALSE){
 
 	url <- paste0('https://graph.facebook.com/', page,
 		'/posts?fields=from,message,created_time,type,link,comments.summary(true)',
@@ -65,11 +74,11 @@ getPage <- function(page, token, n=100, since=NULL, until=NULL, feed=FALSE){
 	if (!is.null(since)){
 		url <- paste0(url, '&since=', since)
 	}
-	if (n<=100){
+	if (n<=80){
 		url <- paste0(url, "&limit=", n)
 	}
-	if (n>100){
-		url <- paste0(url, "&limit=100")
+	if (n>80){
+		url <- paste0(url, "&limit=80")
 	}
 	# making query
 	content <- callAPI(url=url, token=token)
@@ -101,8 +110,8 @@ getPage <- function(page, token, n=100, since=NULL, until=NULL, feed=FALSE){
 		mindate <- as.Date(Sys.time())
 	}
 
-	## paging if n>100
-	if (n>100){
+	## paging if n>80
+	if (n>80){
 		df.list <- list(df)
 		while (l<n & length(content$data)>0 & 
 			!is.null(content$paging$`next`) & sincedate <= mindate){
@@ -125,13 +134,18 @@ getPage <- function(page, token, n=100, since=NULL, until=NULL, feed=FALSE){
 			new.df <- pageDataToDF(content$data)
 			df.list <- c(df.list, list(new.df))
 
-			if (!is.null(since)){
+			if (!is.null(since) & nrow(new.df)>0){
 				dates <- formatFbDate(new.df$created_time, 'date')
 				mindate <- min(dates)
 			}
 		}
 		df <- do.call(rbind, df.list)
 	}
+	# returning only those requested
+	if (nrow(df)>n){
+		df <- df[1:n,]
+	}
+
 	# deleting posts after specified date
 	if (!is.null(since)){
 		dates <- formatFbDate(df$created_time, 'date')

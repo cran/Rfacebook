@@ -4,7 +4,7 @@
 \alias{getPage}
 \title{Extract list of posts from a public Facebook page}
 \usage{
-getPage(page, token, n = 100, since = NULL, until = NULL, feed = FALSE)
+getPage(page, token, n = 80, since = NULL, until = NULL, feed = FALSE)
 }
 \arguments{
 \item{page}{A page ID or page name.}
@@ -31,6 +31,14 @@ that were made by others (not only the admin of the page).}
 \code{getPage} retrieves information from a public Facebook page. Note that
 information about users that have turned on the "follow" option on their
 profile can also be retrieved with this function.
+}
+\details{
+This function will only return information from public pages, not users
+with public profiles.
+
+The \code{since} and \code{until} parameters are applied to the \code{updated_time}
+field in the post objects, and not the \code{created_time}. As a result, this function
+might return old posts that have been updated recently.
 }
 \examples{
 \dontrun{

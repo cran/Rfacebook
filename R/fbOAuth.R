@@ -34,6 +34,21 @@
 #' Third, after pressing Enter, R will try to open a browser window to sign the token. If 
 #' everything works well, you will get a message that says you can return to R. If not,
 #' try again in a few minutes to make sure your app had its settings updated properly.
+#' 
+#' To ensure proper functioning of the "getInsights" function-family you will need to 
+#' specify the exact permissions granted to your app. As this is (to our knowledge) currently not
+#' possible through the R based authentication process, please follow these steps:
+#' 
+#' -> Create App as mentioned above.
+#' 1. Open the "Graph API Explorer": \url{https://developers.facebook.com/tools/explorer/}
+#' 2. Select your app in the upper right corner
+#' 3. Click "Get Token" -> "Get Access Token"
+#' 4. In the popup navigate to "Extended Permissions" and select "Insights"
+#' 5. Confirm
+#' 6. Ignore the following warning message ("Submit for Login Review...") and confirm again.
+#' 6. Go back to R and run fbOAuth with extended_permissions (still) set to FALSE. 
+#' -> See third step for possible messages concerning token creation.
+#'
 #'
 #' @author
 #' Pablo Barbera \email{pablo.barbera@@nyu.edu}
@@ -48,9 +63,15 @@
 #' @param extended_permissions If \code{TRUE}, the token will give access to some of
 #' the authenticated user's private information (birthday, hometown, location,
 #' relationships) and that of his/her friends, and permissions to post
-#' status updates as well as to access checkins, likes, and the user's newsfeed. 
+#' status updates as well as to access checkins, likes, and the user's newsfeed
 #' If \code{FALSE}, token will give access only to public information. Note 
 #' that \code{updateStatus} will only work for tokens with extended permissions.
+#' After version 2.0 of the Graph API, creating an application with these permissions
+#' requires passing App Review (\url{https://developers.facebook.com/docs/facebook-login/review})
+#'
+#' @param legacy_permissions For tokens created with old versions of the API, this option
+#' adds the "read_stream" permission
+#'
 #'
 #' @examples \dontrun{
 #' ## an example of an authenticated request after creating the OAuth token
@@ -69,7 +90,7 @@
 #'
 
 
-fbOAuth <- function(app_id, app_secret, extended_permissions=TRUE)
+fbOAuth <- function(app_id, app_secret, extended_permissions=FALSE, legacy_permissions=FALSE)
 {
 	## getting callback URL
 	full_url <- oauth_callback()
@@ -84,10 +105,14 @@ fbOAuth <- function(app_id, app_secret, extended_permissions=TRUE)
 	  access = "https://graph.facebook.com/oauth/access_token")	
 	myapp <- oauth_app("facebook", app_id, app_secret)
 	if (extended_permissions==TRUE){
-		scope <- paste("user_friends,user_birthday,user_hometown,user_location,user_relationships,",
-			"publish_actions,user_status,user_likes,read_stream", collapse="")
+		scope <- paste("user_birthday,user_hometown,user_location,user_relationships,",
+			"publish_actions,user_status,user_likes", collapse="")
 	}
-	else { scope <- NULL}
+	else { scope <- "public_profile,user_friends"}
+	
+	if (legacy_permissions==TRUE) {
+	  scope <- paste(scope, "read_stream", sep = ",")
+	}
 
 	## with early httr versions
 	if (packageVersion('httr') <= "0.2"){
