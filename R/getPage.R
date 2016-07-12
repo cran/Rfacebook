@@ -42,6 +42,9 @@
 #' @param feed If \code{TRUE}, the function will also return posts on the page
 #' that were made by others (not only the admin of the page).
 #'
+#' @param reactions If \code{TRUE}, will add variables to the data frame with
+#' the total count of reactions: love, haha, wow, sad, angry.
+#'
 #'
 #' @examples \dontrun{
 #' ## See examples for fbOAuth to know how token was created.
@@ -58,7 +61,7 @@
 #'
 
 
-getPage <- function(page, token, n=80, since=NULL, until=NULL, feed=FALSE){
+getPage <- function(page, token, n=25, since=NULL, until=NULL, feed=FALSE, reactions=FALSE){
 
 	url <- paste0('https://graph.facebook.com/', page,
 		'/posts?fields=from,message,created_time,type,link,comments.summary(true)',
@@ -74,11 +77,11 @@ getPage <- function(page, token, n=80, since=NULL, until=NULL, feed=FALSE){
 	if (!is.null(since)){
 		url <- paste0(url, '&since=', since)
 	}
-	if (n<=80){
+	if (n<=25){
 		url <- paste0(url, "&limit=", n)
 	}
-	if (n>80){
-		url <- paste0(url, "&limit=80")
+	if (n>25){
+		url <- paste0(url, "&limit=25")
 	}
 	# making query
 	content <- callAPI(url=url, token=token)
@@ -94,7 +97,8 @@ getPage <- function(page, token, n=80, since=NULL, until=NULL, feed=FALSE){
 		if (error==3){ stop(content$error_msg) }
 	}
 	if (length(content$data)==0){ 
-		stop("No public posts were found")
+		message("No public posts were found")
+		return(data.frame())
 	}
 	df <- pageDataToDF(content$data)
 
@@ -110,8 +114,8 @@ getPage <- function(page, token, n=80, since=NULL, until=NULL, feed=FALSE){
 		mindate <- as.Date(Sys.time())
 	}
 
-	## paging if n>80
-	if (n>80){
+	## paging if n>25
+	if (n>25){
 		df.list <- list(df)
 		while (l<n & length(content$data)>0 & 
 			!is.null(content$paging$`next`) & sincedate <= mindate){
@@ -151,6 +155,15 @@ getPage <- function(page, token, n=80, since=NULL, until=NULL, feed=FALSE){
 		dates <- formatFbDate(df$created_time, 'date')
 		df <- df[dates>=sincedate,]
 	}
+
+	# adding reactions data
+	if (reactions==TRUE){
+		re = getReactions(df$id, token=token, verbose=FALSE)
+		df <- merge(df, re, all.x=TRUE)
+		# sorting
+		df <- df[order(df$created_time),]
+	}
+
 	return(df)
 }
 
